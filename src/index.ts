@@ -10,19 +10,40 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>().basePath("/api");
 
-app.use('/api/*', cors({
-	origin: ['http://localhost:5173'], // Reactアプリのオリジン
-	allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-	allowHeaders: ['Content-Type', 'Authorization', 'Access-Control-Allow-Origin'],
-	exposeHeaders: ['Content-Length'],
-	maxAge: 0,// preflight requestのキャッシュ時間	
-	credentials: true,
-}));
+// app.use('/api/*', cors({
+// 	origin: ['http://localhost:5173'], // Reactアプリのオリジン
+// 	allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+// 	allowHeaders: ['Content-Type', 'Authorization', 'Access-Control-Allow-Origin'],
+// 	exposeHeaders: ['Content-Length'],
+// 	maxAge: 0,// preflight requestのキャッシュ時間	
+// 	credentials: true,
+// }));
 
 
 app.options('*', (c) => {
 	return new Response(null, { status: 204 });
 })
+
+app.get("/drills/:id", async (c) => {
+    const id = parseInt(c.req.param("id"));
+    try {
+        const db = drizzle(c.env.DB);
+        const results = await db.select().from(drills).where(eq(drills.id, id));
+        return c.json(results);
+    } catch (e) {
+        return c.json({ err: e }, 500);
+    }
+});
+
+app.get("/drills", async (c) => {
+    try {
+        const db = drizzle(c.env.DB);
+        const results = await db.select().from(drills);
+        return c.json(results);
+    } catch (e) {
+        return c.json({ err: e }, 500);
+    }
+});
 
 app.post("/drills", async (c) => {
 	const drill = await c.req.json<typeof drills.$inferInsert>()
