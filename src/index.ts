@@ -2,15 +2,10 @@ import { Hono } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import { drills } from "./../db/schema";
 import { eq } from "drizzle-orm";
-import { clerkMiddleware, getAuth } from "@hono/clerk-auth";
-import { bearerAuth } from 'hono/bearer-auth';
-import { clerkClient, createClerkClient } from '@clerk/clerk-sdk-node';
 import { cors } from 'hono/cors';
 
 type Bindings = {
 	DB: D1Database;
-	CLERK_PUBLISHABLE_KEY: string;
-	CLERK_SECRET_KEY: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>().basePath("/api");
@@ -24,57 +19,10 @@ app.use('/api/*', cors({
 	credentials: true,
 }));
 
-// app.use('*', (c, next) => {
-// 	c.header('Access-Control-Allow-Origin', '*')
-// 	c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-// 	c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-// 	return next()
-// })
 
 app.options('*', (c) => {
 	return new Response(null, { status: 204 });
 })
-
-
-app.use('*', clerkMiddleware())
-
-
-// 公開エンドポイント
-app.get("/public", (c) => c.text("This is a public endpoint"));
-
-// 認証が必要なエンドポイント
-app.get("/protected", async (c) => {
-
-	const auth = getAuth(c)
-
-	if (!auth?.userId) {
-		return c.json({
-			message: 'You are not logged in.',
-		})
-	}
-
-	return c.json({
-		message: 'You are logged in!',
-		userId: auth.userId,
-	})
-});
-
-app.get("/drills", async (c) => {
-
-	const auth = getAuth(c)
-	if (!auth?.userId) {
-		return c.json({
-			message: 'You are not logged in.',
-		})
-	}
-	try {
-		const db = drizzle(c.env.DB);
-		const results = await db.select().from(drills);
-		return c.json(results);
-	} catch (e) {
-		return c.json({ err: e }, 500);
-	}
-});
 
 app.post("/drills", async (c) => {
 	const drill = await c.req.json<typeof drills.$inferInsert>()
@@ -110,7 +58,5 @@ app.delete("/drills/:id", async (c) => {
 		return c.json({ err: e }, 500);
 	}
 });
-
-
 
 export default app;
