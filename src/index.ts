@@ -11,9 +11,18 @@ type Bindings = {
 	DB: D1Database;
 	CLERK_PUBLISHABLE_KEY: string;
 	CLERK_SECRET_KEY: string;
+	CORS_ORIGIN:string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>().basePath("/api");
+
+
+app.use('*', async (c, next) => {
+    const corsMiddlewareHandler = cors({
+      origin: c.env.CORS_ORIGIN,
+    })
+    return corsMiddlewareHandler(c, next)
+  })
 
 app.use('/api/*', cors({
 	origin: ['http://localhost:5173'], // Reactアプリのオリジン
