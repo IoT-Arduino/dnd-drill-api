@@ -16,7 +16,7 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>().basePath("/api");
 
-
+// origin ドメインを明示的に示すもの。はずすとCORSエラーになる。
 app.use('*', async (c, next) => {
     const corsMiddlewareHandler = cors({
       origin: c.env.CORS_ORIGIN,
@@ -24,12 +24,16 @@ app.use('*', async (c, next) => {
     return corsMiddlewareHandler(c, next)
   })
 
+app.options('*', (c) => {
+	return new Response(null, { status: 204 });
+})
+
 app.use('/api/*', cors({
 	origin: ['http://localhost:5173'], // Reactアプリのオリジン
 	allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 	allowHeaders: ['Content-Type', 'Authorization', 'Access-Control-Allow-Origin'],
-	exposeHeaders: ['Content-Length'],
-	maxAge: 0,// preflight requestのキャッシュ時間	
+	exposeHeaders: [],
+	maxAge: 600,// preflight requestのキャッシュ時間	
 	credentials: true,
 }));
 
@@ -40,36 +44,29 @@ app.use('/api/*', cors({
 // 	return next()
 // })
 
-app.options('*', (c) => {
-	return new Response(null, { status: 204 });
-})
-
-
 app.use('*', clerkMiddleware())
 
-
 // 公開エンドポイント
-app.get("/public", (c) => c.text("This is a public endpoint"));
+// app.get("/public", (c) => c.text("This is a public endpoint"));
 
 // 認証が必要なエンドポイント
-app.get("/protected", async (c) => {
+// app.get("/protected", async (c) => {
 
-	const auth = getAuth(c)
+// 	const auth = getAuth(c)
 
-	if (!auth?.userId) {
-		return c.json({
-			message: 'You are not logged in.',
-		})
-	}
+// 	if (!auth?.userId) {
+// 		return c.json({
+// 			message: 'You are not logged in.',
+// 		})
+// 	}
 
-	return c.json({
-		message: 'You are logged in!',
-		userId: auth.userId,
-	})
-});
+// 	return c.json({
+// 		message: 'You are logged in!',
+// 		userId: auth.userId,
+// 	})
+// });
 
 app.get("/drills", async (c) => {
-
 	const auth = getAuth(c)
 	if (!auth?.userId) {
 		return c.json({
@@ -85,7 +82,30 @@ app.get("/drills", async (c) => {
 	}
 });
 
+app.get("/drills/:id", async (c) => {
+	const id = parseInt(c.req.param("id"));
+	const auth = getAuth(c)
+	if (!auth?.userId) {
+		return c.json({
+			message: 'You are not logged in.',
+		})
+	}
+	try {
+		const db = drizzle(c.env.DB);
+		const results = await db.select().from(drills).where(eq(drills.id, id));;
+		return c.json(results);
+	} catch (e) {
+		return c.json({ err: e }, 500);
+	}
+});
+
 app.post("/drills", async (c) => {
+	const auth = getAuth(c)
+	if (!auth?.userId) {
+		return c.json({
+			message: 'You are not logged in.',
+		})
+	}
 	const drill = await c.req.json<typeof drills.$inferInsert>()
 	try {
 		const db = drizzle(c.env.DB);
@@ -98,6 +118,12 @@ app.post("/drills", async (c) => {
 
 
 app.put("/drills/:id", async (c) => {
+	const auth = getAuth(c)
+	if (!auth?.userId) {
+		return c.json({
+			message: 'You are not logged in.',
+		})
+	}
 	const id = parseInt(c.req.param("id"));
 	const { status, columnId, content } = await c.req.json<typeof drills.$inferInsert>()
 	try {
@@ -110,6 +136,12 @@ app.put("/drills/:id", async (c) => {
 });
 
 app.delete("/drills/:id", async (c) => {
+	const auth = getAuth(c)
+	if (!auth?.userId) {
+		return c.json({
+			message: 'You are not logged in.',
+		})
+	}
 	const id = parseInt(c.req.param("id"));
 	try {
 		const db = drizzle(c.env.DB);

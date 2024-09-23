@@ -11,7 +11,7 @@ database_id = "33a9d96f-3aa3-4fd8-9e36-6f7e3d5aef13"
 migrations_dir = "drizzle/migrations"
 
 [vars]
-CLERK_PUBLISHABLE_KEY = ""
+CLERK_PUBLISHABLE_KEY = "pk_test_YmVsb3ZlZC1jdWItNDUuY2xlcmsuYWNjb3VudHMuZGV2JA"
 CLERK_SECRET_KEY = ""
 CORS_ORIGIN = "http://localhost:5173"
 
