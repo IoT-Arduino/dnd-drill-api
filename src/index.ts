@@ -3,49 +3,108 @@ import { drizzle } from "drizzle-orm/d1";
 import { drills } from "./../db/schema";
 import { eq } from "drizzle-orm";
 import { cors } from 'hono/cors';
+import { clerkMiddleware, getAuth } from "@hono/clerk-auth";
 
 type Bindings = {
 	DB: D1Database;
+	CLERK_PUBLISHABLE_KEY: string;
+	CLERK_SECRET_KEY: string;
+	CORS_ORIGIN:string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>().basePath("/api");
 
-// app.use('/api/*', cors({
-// 	origin: ['http://localhost:5173'], // Reactアプリのオリジン
-// 	allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-// 	allowHeaders: ['Content-Type', 'Authorization', 'Access-Control-Allow-Origin'],
-// 	exposeHeaders: ['Content-Length'],
-// 	maxAge: 0,// preflight requestのキャッシュ時間	
-// 	credentials: true,
-// }));
-
+// origin ドメインを明示的に示すもの。はずすとCORSエラーになる。
+app.use('*', async (c, next) => {
+    const corsMiddlewareHandler = cors({
+      origin: c.env.CORS_ORIGIN,
+    })
+    return corsMiddlewareHandler(c, next)
+  })
 
 app.options('*', (c) => {
 	return new Response(null, { status: 204 });
 })
 
-app.get("/drills/:id", async (c) => {
-    const id = parseInt(c.req.param("id"));
-    try {
-        const db = drizzle(c.env.DB);
-        const results = await db.select().from(drills).where(eq(drills.id, id));
-        return c.json(results);
-    } catch (e) {
-        return c.json({ err: e }, 500);
-    }
-});
+app.use('/api/*', cors({
+	origin: ['http://localhost:5173'], // Reactアプリのオリジン
+	allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+	allowHeaders: ['Content-Type', 'Authorization', 'Access-Control-Allow-Origin'],
+	exposeHeaders: [],
+	maxAge: 600,// preflight requestのキャッシュ時間	
+	credentials: true,
+}));
+
+// app.use('*', (c, next) => {
+// 	c.header('Access-Control-Allow-Origin', '*')
+// 	c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+// 	c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+// 	return next()
+// })
+
+app.use('*', clerkMiddleware())
+
+// 公開エンドポイント
+// app.get("/public", (c) => c.text("This is a public endpoint"));
+
+// 認証が必要なエンドポイント
+// app.get("/protected", async (c) => {
+
+// 	const auth = getAuth(c)
+
+// 	if (!auth?.userId) {
+// 		return c.json({
+// 			message: 'You are not logged in.',
+// 		})
+// 	}
+
+// 	return c.json({
+// 		message: 'You are logged in!',
+// 		userId: auth.userId,
+// 	})
+// });
 
 app.get("/drills", async (c) => {
-    try {
-        const db = drizzle(c.env.DB);
-        const results = await db.select().from(drills);
-        return c.json(results);
-    } catch (e) {
-        return c.json({ err: e }, 500);
-    }
+	const auth = getAuth(c)
+	if (!auth?.userId) {
+		return c.json({
+			message: 'You are not logged in.',
+		})
+	}
+	// console.log("userId",auth.userId)
+	try {
+		const db = drizzle(c.env.DB);
+		const results = await db.select().from(drills);
+		return c.json(results);
+	} catch (e) {
+		return c.json({ err: e }, 500);
+	}
+});
+
+app.get("/drills/:id", async (c) => {
+	const id = parseInt(c.req.param("id"));
+	const auth = getAuth(c)
+	if (!auth?.userId) {
+		return c.json({
+			message: 'You are not logged in.',
+		})
+	}
+	try {
+		const db = drizzle(c.env.DB);
+		const results = await db.select().from(drills).where(eq(drills.id, id));;
+		return c.json(results);
+	} catch (e) {
+		return c.json({ err: e }, 500);
+	}
 });
 
 app.post("/drills", async (c) => {
+	const auth = getAuth(c)
+	if (!auth?.userId) {
+		return c.json({
+			message: 'You are not logged in.',
+		})
+	}
 	const drill = await c.req.json<typeof drills.$inferInsert>()
 	try {
 		const db = drizzle(c.env.DB);
@@ -58,6 +117,12 @@ app.post("/drills", async (c) => {
 
 
 app.put("/drills/:id", async (c) => {
+	const auth = getAuth(c)
+	if (!auth?.userId) {
+		return c.json({
+			message: 'You are not logged in.',
+		})
+	}
 	const id = parseInt(c.req.param("id"));
 	const { status, columnId, content } = await c.req.json<typeof drills.$inferInsert>()
 	try {
@@ -70,6 +135,12 @@ app.put("/drills/:id", async (c) => {
 });
 
 app.delete("/drills/:id", async (c) => {
+	const auth = getAuth(c)
+	if (!auth?.userId) {
+		return c.json({
+			message: 'You are not logged in.',
+		})
+	}
 	const id = parseInt(c.req.param("id"));
 	try {
 		const db = drizzle(c.env.DB);
