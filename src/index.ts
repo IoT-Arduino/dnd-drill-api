@@ -73,6 +73,7 @@ app.get("/drills", async (c) => {
 			message: 'You are not logged in.',
 		})
 	}
+	// console.log("userId",auth.userId)
 	try {
 		const db = drizzle(c.env.DB);
 		const results = await db.select().from(drills);
