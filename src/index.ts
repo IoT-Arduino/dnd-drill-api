@@ -2,10 +2,8 @@ import { Hono } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import { drills } from "./../db/schema";
 import { eq } from "drizzle-orm";
-import { clerkMiddleware, getAuth } from "@hono/clerk-auth";
-import { bearerAuth } from 'hono/bearer-auth';
-import { clerkClient, createClerkClient } from '@clerk/clerk-sdk-node';
 import { cors } from 'hono/cors';
+import { clerkMiddleware, getAuth } from "@hono/clerk-auth";
 
 type Bindings = {
 	DB: D1Database;
@@ -152,7 +150,5 @@ app.delete("/drills/:id", async (c) => {
 		return c.json({ err: e }, 500);
 	}
 });
-
-
 
 export default app;
