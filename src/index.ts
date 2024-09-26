@@ -35,34 +35,7 @@ app.use('/api/*', cors({
 	credentials: true,
 }));
 
-// app.use('*', (c, next) => {
-// 	c.header('Access-Control-Allow-Origin', '*')
-// 	c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-// 	c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-// 	return next()
-// })
-
 app.use('*', clerkMiddleware())
-
-// 公開エンドポイント
-// app.get("/public", (c) => c.text("This is a public endpoint"));
-
-// 認証が必要なエンドポイント
-// app.get("/protected", async (c) => {
-
-// 	const auth = getAuth(c)
-
-// 	if (!auth?.userId) {
-// 		return c.json({
-// 			message: 'You are not logged in.',
-// 		})
-// 	}
-
-// 	return c.json({
-// 		message: 'You are logged in!',
-// 		userId: auth.userId,
-// 	})
-// });
 
 app.get("/drills", async (c) => {
 	const auth = getAuth(c)
