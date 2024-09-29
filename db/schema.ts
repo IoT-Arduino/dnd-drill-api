@@ -9,35 +9,19 @@ export const drills = sqliteTable("drills", {
   content: text("content").notNull(),
   url: text("url").notNull(),
   status: integer("status").notNull().default(sql`0`),
-  createAt: text("create_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-  updateAt: text("update_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 // historyテーブル
-export const history = sqliteTable("history", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  userId: text("user_id").notNull(),
-  date: integer("date").notNull(),
-  memo: text("memo"),
-  createAt: text("create_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+export const history = sqliteTable('history', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: text('user_id').notNull(),
+  memo: text('memo').notNull(),
+  drills: text('drills').notNull(), // JSON文字列として保存
+  createdAt: text('created_at').notNull()
+    .$defaultFn(() => {
+      const now = new Date();
+      return now.toISOString().slice(0, 16).replace('T', ' '); // 'YYYY-MM-DD HH:MM' 形式
+    }),
 });
-
-// history_itemsテーブル
-export const historyItems = sqliteTable("history_items", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  historyId: integer("history_id").notNull(),
-  contentText: text("content_text").notNull(),
-  contentUrl: text("content_url").notNull(),
-  contentId: text("content_id").notNull(),
-});
-
-// リレーション
-import { relations } from 'drizzle-orm';
-
-export const historyRelations = relations(history, ({ many }) => ({
-  items: many(historyItems),
-}));
-
-export const historyItemsRelations = relations(historyItems, ({ one }) => ({
-  history: one(history, { fields: [historyItems.historyId], references: [history.id] }),
-}));

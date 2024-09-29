@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { drizzle } from "drizzle-orm/d1";
-import { drills } from "./../db/schema";
-import { eq } from "drizzle-orm";
+import { drills,history } from "./../db/schema";
+import { eq, sql } from "drizzle-orm";
 import { cors } from 'hono/cors';
 import { clerkMiddleware, getAuth } from "@hono/clerk-auth";
 
@@ -123,5 +123,55 @@ app.delete("/drills/:id", async (c) => {
 		return c.json({ err: e }, 500);
 	}
 });
+
+type HistoryEntry = {
+	id: number;
+	userId: string;
+	memo: string;
+	createdAt: string;
+	drills: string;
+  };
+  
+  type GroupedHistory = {
+	[date: string]: HistoryEntry[];
+  };
+
+app.get("/history", async (c) => {
+	const auth = getAuth(c)
+	if (!auth?.userId) {
+		return c.json({
+			message: 'You are not logged in.',
+		})
+	}
+	// console.log("userId",auth.userId)
+	try {
+		// co
+		const db = drizzle(c.env.DB);
+		const results = await db.select()
+		  .from(history)
+		  .orderBy(sql`${history.createdAt} DESC`) as HistoryEntry[];
+	
+		const groupedResults = results.reduce<GroupedHistory>((acc, item) => {
+		  if (!acc[item.createdAt]) {
+			acc[item.createdAt] = {
+			  memo: item.memo,
+			  userId: item.userId,
+			  drills: JSON.parse(item.drills)
+			};
+		  }
+		  return acc;
+		}, {} )
+
+		return c.json(results);
+	} catch (e) {
+		return c.json({ err: e }, 500);
+	}
+});
+
+
+
+
+
+
 
 export default app;
