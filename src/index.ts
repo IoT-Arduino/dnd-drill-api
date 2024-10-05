@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import { drills, history } from "./../db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import { cors } from 'hono/cors';
 import { clerkMiddleware, getAuth } from "@hono/clerk-auth";
 import { CORS_ORIGIN } from "./const";
@@ -47,32 +47,41 @@ app.get("/drills", async (c) => {
 			message: 'You are not logged in.',
 		})
 	}
-	// console.log("userId",auth.userId)
 	try {
 		const db = drizzle(c.env.DB);
-		const results = await db.select().from(drills);
+		const results = await db.select().from(drills).where(eq(drills.userId, auth.userId));;
 		return c.json(results);
 	} catch (e) {
 		return c.json({ err: e }, 500);
 	}
 });
 
-app.get("/drills/:id", async (c) => {
-	const id = parseInt(c.req.param("id"));
-	const auth = getAuth(c)
-	if (!auth?.userId) {
-		return c.json({
-			message: 'You are not logged in.',
-		})
-	}
-	try {
-		const db = drizzle(c.env.DB);
-		const results = await db.select().from(drills).where(eq(drills.id, id));;
-		return c.json(results);
-	} catch (e) {
-		return c.json({ err: e }, 500);
-	}
-});
+// -- 現時点では、個別drillのgetは使用していない。　-- 
+// app.get("/drills/:id", async (c) => {
+// 	const id = parseInt(c.req.param("id"));
+// 	const auth = getAuth(c)
+// 	if (!auth?.userId) {
+// 		return c.json({
+// 			message: 'You are not logged in.',
+// 		})
+// 	}
+// 	try {
+// 		const db = drizzle(c.env.DB);
+// 		const results = await db.select().from(drills).where(and(
+// 			eq(drills.id, id),
+// 			eq(drills.userId, auth.userId)
+// 		  ))
+// 		  .limit(1);
+
+// 		  if (results.length === 0) {
+// 			return c.json({ message: 'Drill not found or you do not have permission to access it.' }, 404);
+// 		  }
+
+// 		return c.json(results[0]);
+// 	} catch (e) {
+// 		return c.json({ err: e }, 500);
+// 	}
+// });
 
 app.post("/drills", async (c) => {
 	const auth = getAuth(c)
@@ -97,9 +106,15 @@ app.post("/drills", async (c) => {
 				'Content-Type': 'application/json'
 			}
 		});
+
+		// 以下だと、追加したdrillが、即座に画面に追加表示されない。
+		// return c.json({ 
+		// 	message: "Drill created successfully",
+		// 	drill: insertedDrill
+		//   }, 201);
 	} catch (e: any) {
 		console.error('Error inserting drill:', e);
-		return c.json({ error: e.message, stack: e.stack }, 500);
+		return c.json({ error: 'An error occurred while creating the drill' }, 500);
 	}
 });
 
@@ -119,16 +134,19 @@ app.put("/drills/:id", async (c) => {
 
 		const [updatedDrill] = await db.update(drills)
 			.set({ url, content, status, columnId })
-			.where(eq(drills.id, id))
+			.where(and(
+				eq(drills.id, id),
+				eq(drills.userId, auth.userId)
+			))
 			.returning();
 
-		// JSON形式でレスポンスを返す
-		return new Response(JSON.stringify(updatedDrill), {
-			status: 201,
-			headers: {
-				'Content-Type': 'application/json'
-			}
-		});
+		if (!updatedDrill) {
+			return c.json({
+				message: 'Drill not found or you do not have permission to update it.',
+			}, 404);
+		}
+
+		return c.json(updatedDrill, 200);
 	} catch (e: any) {
 		console.error('Error updating drill:', e);
 		return c.json({ error: e.message, stack: e.stack }, 500);
@@ -145,7 +163,18 @@ app.delete("/drills/:id", async (c) => {
 	const id = parseInt(c.req.param("id"));
 	try {
 		const db = drizzle(c.env.DB);
-		await db.delete(drills).where(eq(drills.id, id));
+		const [deletedDrill] = await db.delete(drills)
+			.where(and(
+				eq(drills.id, id),
+				eq(drills.userId, auth.userId)
+			))
+			.returning();
+
+		if (!deletedDrill) {
+			return c.json({
+				message: 'Drill not found or you do not have permission to delete it.',
+			}, 404);
+		}
 		return c.json({ message: "success" }, 200);
 	} catch (e) {
 		return c.json({ err: e }, 500);
@@ -164,11 +193,21 @@ app.get("/history", async (c) => {
 		const db = drizzle(c.env.DB);
 		const results = await db.select()
 			.from(history)
+			.where(eq(history.userId, auth.userId))
 			.orderBy(sql`${history.createdAt} DESC`) as HistoryEntry[];
+
+		if (results.length === 0) {
+			return c.json({
+				message: 'No history found for this user.',
+			}, 204);
+		}
 
 		return c.json(results);
 	} catch (e) {
-		return c.json({ err: e }, 500);
+		console.error('Error fetching history:', e);
+		return c.json({
+			error: 'An error occurred while fetching the history',
+		}, 500);
 	}
 });
 
@@ -193,9 +232,12 @@ app.post("/history", async (c) => {
 			createdAt: new Date().toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
 		};
 
-		await db.insert(history).values(newHistoryEntry);
+		const [insertedEntry] = await db.insert(history).values(newHistoryEntry).returning();
 
-		return c.json({ message: "History entry created successfully" }, 201);
+		return c.json({
+			message: "History entry created successfully",
+			entry: insertedEntry
+		}, 201);
 	} catch (e) {
 		console.error('Error creating history entry:', e);
 		return c.json({ error: 'Internal Server Error' }, 500);
