@@ -196,12 +196,6 @@ app.get("/history", async (c) => {
 			.where(eq(history.userId, auth.userId))
 			.orderBy(sql`${history.createdAt} DESC`) as HistoryEntry[];
 
-		if (results.length === 0) {
-			return c.json({
-				message: 'No history found for this user.',
-			}, 204);
-		}
-
 		return c.json(results);
 	} catch (e) {
 		console.error('Error fetching history:', e);
