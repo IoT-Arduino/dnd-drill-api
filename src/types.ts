@@ -1,1 +1,7 @@
-type Bindings = { DB: D1Database };
+export type HistoryEntry = {
+	id: number;
+	userId: string;
+	memo: string;
+	createdAt: string;
+	drills: string;
+};
